@@ -188,12 +188,11 @@ int main(void)
 
         case CAR_STOP:
             motor_stop();
-            servo_set_angle(90);
             break;
 
         case CAR_FORWARD:
-            motor_set(MOTOR_FORWARD, MOTOR_PWM_MAX);
-            servo_set_angle(90);
+            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX,
+                        MOTOR_FORWARD, MOTOR_PWM_MAX);
             if (obs_cnt >= 8) {
                 resume_state = CAR_FORWARD;
                 state        = CAR_AV_BRAKE;
@@ -202,13 +201,14 @@ int main(void)
             break;
 
         case CAR_BACKWARD:
-            motor_set(MOTOR_BACKWARD, MOTOR_PWM_MAX);
-            servo_set_angle(90);
+            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_MAX,
+                        MOTOR_BACKWARD, MOTOR_PWM_MAX);
             break;
 
         case CAR_LEFT:
-            motor_set(MOTOR_FORWARD, MOTOR_PWM_MAX * 7 / 10);
-            servo_set_angle(45);
+            /* 左轉：左輪慢，右輪快 */
+            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX * MOTOR_TURN_RATIO / 10,
+                        MOTOR_FORWARD, MOTOR_PWM_MAX);
             if (obs_cnt >= 8) {
                 resume_state = CAR_LEFT;
                 state        = CAR_AV_BRAKE;
@@ -217,8 +217,9 @@ int main(void)
             break;
 
         case CAR_RIGHT:
-            motor_set(MOTOR_FORWARD, MOTOR_PWM_MAX * 7 / 10);
-            servo_set_angle(135);
+            /* 右轉：左輪快，右輪慢 */
+            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX,
+                        MOTOR_FORWARD, MOTOR_PWM_MAX * MOTOR_TURN_RATIO / 10);
             if (obs_cnt >= 8) {
                 resume_state = CAR_RIGHT;
                 state        = CAR_AV_BRAKE;
@@ -228,7 +229,6 @@ int main(void)
 
         case CAR_AV_BRAKE:
             motor_stop();
-            servo_set_angle(90);
             if (HAL_GetTick() - state_timer >= 150) {
                 state       = CAR_AV_BACKUP;
                 state_timer = HAL_GetTick();
@@ -236,8 +236,8 @@ int main(void)
             break;
 
         case CAR_AV_BACKUP:
-            motor_set(MOTOR_BACKWARD, MOTOR_PWM_MAX);
-            servo_set_angle(90);
+            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_MAX,
+                        MOTOR_BACKWARD, MOTOR_PWM_MAX);
             if (HAL_GetTick() - state_timer >= 500) {
                 state       = CAR_AV_TURN;
                 state_timer = HAL_GetTick();
@@ -245,20 +245,19 @@ int main(void)
             break;
 
         case CAR_AV_TURN:
-            motor_set(MOTOR_FORWARD, MOTOR_PWM_MAX);
-            servo_set_angle(45);
+            /* 原地左轉：左輪後退，右輪前進 */
+            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_MAX * 6 / 10,
+                        MOTOR_FORWARD,  MOTOR_PWM_MAX * 6 / 10);
             if (HAL_GetTick() - state_timer >= 700) {
                 state       = CAR_AV_CHECK;
                 state_timer = HAL_GetTick();
                 obs_cnt     = 6;
                 clr_cnt     = 0;
-                servo_set_angle(90);
             }
             break;
 
         case CAR_AV_CHECK:
             motor_stop();
-            servo_set_angle(90);
             if (obs_cnt >= 8) {
                 /* 障礙仍在，再次閃避 */
                 state       = CAR_AV_BRAKE;
