@@ -7,7 +7,7 @@
 #define MOTOR_PWM_MAX   8399
 
 /* 轉速比例（轉向時內輪速度） */
-#define MOTOR_TURN_RATIO   3   /* 內輪速 = MAX * 3/10 */
+#define MOTOR_TURN_RATIO   6   /* 內輪速 = MAX * 6/10 */
 
 typedef enum {
     MOTOR_FORWARD,

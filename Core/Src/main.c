@@ -154,7 +154,9 @@ int main(void)
     uint16_t dist = ultrasonic_get_distance();
 
     /* 雙向計數器：主動動作中暫停，CHECK 狀態繼續感測 */
-    if (state < CAR_AV_BRAKE || state == CAR_AV_CHECK) {
+    /* TODO: 測試完成後移除 avoidance_off，恢復避障 */
+    uint8_t avoidance_off = 1;
+    if (!avoidance_off && (state < CAR_AV_BRAKE || state == CAR_AV_CHECK)) {
         if (dist > 0 && dist < 20) {
             if (obs_cnt < 8) obs_cnt++;
             if (clr_cnt > 0) clr_cnt--;
@@ -163,6 +165,13 @@ int main(void)
             if (obs_cnt > 0) obs_cnt--;
         }
         /* dist=0：量測失敗，不改變狀態 */
+
+        /* IR 感測器：前進方向有效，偵測到障礙直接推高 obs_cnt */
+        if ((state == CAR_FORWARD || state == CAR_LEFT || state == CAR_RIGHT)
+            && ir_sensor_read()) {
+            if (obs_cnt < 8) obs_cnt = 8;   /* 立即觸發閾值 */
+            if (clr_cnt > 0) clr_cnt--;
+        }
     }
 
     /* 藍牙指令：STOP 隨時生效；其他指令只在非避障狀態接受 */
@@ -206,9 +215,8 @@ int main(void)
             break;
 
         case CAR_LEFT:
-            /* 左轉：左輪慢，右輪快 */
-            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX * MOTOR_TURN_RATIO / 10,
-                        MOTOR_FORWARD, MOTOR_PWM_MAX);
+            /* 左轉：左輪停，右輪全速 */
+            motor_drive(MOTOR_STOP,    0,             MOTOR_FORWARD, MOTOR_PWM_MAX);
             if (obs_cnt >= 8) {
                 resume_state = CAR_LEFT;
                 state        = CAR_AV_BRAKE;
@@ -217,9 +225,8 @@ int main(void)
             break;
 
         case CAR_RIGHT:
-            /* 右轉：左輪快，右輪慢 */
-            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX,
-                        MOTOR_FORWARD, MOTOR_PWM_MAX * MOTOR_TURN_RATIO / 10);
+            /* 右轉：左輪全速，右輪停 */
+            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX, MOTOR_STOP,    0);
             if (obs_cnt >= 8) {
                 resume_state = CAR_RIGHT;
                 state        = CAR_AV_BRAKE;
@@ -275,12 +282,13 @@ int main(void)
             break;
     }
 
-    /* debug：每 300ms 印一次 */
+    /* telemetry：每 300ms 送一次 $STATUS 給 App */
     if (HAL_GetTick() - last_print >= 300) {
-        char dbg[48];
-        int len = snprintf(dbg, sizeof(dbg), "d=%u st=%u o=%u c=%u\r\n",
-                           dist, (uint8_t)state, obs_cnt, clr_cnt);
-        HAL_UART_Transmit(&huart6, (uint8_t *)dbg, len, 50);
+        uint16_t spd_pct = (state == CAR_STOP ||
+                            state == CAR_AV_BRAKE ||
+                            state == CAR_AV_CHECK) ? 0 : 100;
+        uint8_t  obs     = (obs_cnt >= 8) ? 1 : 0;
+        bluetooth_send_status(spd_pct, 90, dist, obs);
         last_print = HAL_GetTick();
     }
 

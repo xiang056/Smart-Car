@@ -25,12 +25,12 @@ void motor_drive(MotorDir_t left_dir,  uint16_t left_spd,
     /* 左輪：PE5=IN1, PE6=IN2 */
     switch (left_dir) {
         case MOTOR_FORWARD:
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_6, GPIO_PIN_RESET);
-            break;
-        case MOTOR_BACKWARD:
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_6, GPIO_PIN_SET);
+            break;
+        case MOTOR_BACKWARD:
+            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_6, GPIO_PIN_RESET);
             break;
         default:
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5 | GPIO_PIN_6, GPIO_PIN_RESET);
@@ -41,12 +41,12 @@ void motor_drive(MotorDir_t left_dir,  uint16_t left_spd,
     /* 右輪：PE11=IN3, PE13=IN4 */
     switch (right_dir) {
         case MOTOR_FORWARD:
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_RESET);
-            break;
-        case MOTOR_BACKWARD:
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_RESET);
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_SET);
+            break;
+        case MOTOR_BACKWARD:
+            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13, GPIO_PIN_RESET);
             break;
         default:
             HAL_GPIO_WritePin(GPIOE, GPIO_PIN_11 | GPIO_PIN_13, GPIO_PIN_RESET);

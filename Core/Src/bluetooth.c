@@ -32,8 +32,10 @@ void bluetooth_rx_callback(UART_HandleTypeDef *huart)
 
 BtCmd_t bluetooth_get_cmd(void)
 {
+    __disable_irq();
     BtCmd_t cmd = _pending_cmd;
     _pending_cmd = BT_CMD_NONE;
+    __enable_irq();
     return cmd;
 }
 
