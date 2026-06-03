@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "motor_driver.h"
-#include "servo_driver.h"
 #include "ultrasonic_driver.h"
 #include "ir_sensor_driver.h"
 #include "bluetooth.h"
@@ -122,7 +121,6 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_Delay(2000);
   motor_init(&htim1);
-  servo_init(&htim3);
   bluetooth_init(&huart6);
   ultrasonic_init(&htim2);
 
