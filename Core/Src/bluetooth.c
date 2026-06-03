@@ -51,7 +51,8 @@ void bluetooth_rearm(void)
 void bluetooth_send_status(uint16_t speed_pct, uint8_t angle, uint16_t dist_cm, uint8_t obstacle)
 {
     char buf[48];
-    int len = snprintf(buf, sizeof(buf), "$STATUS,%u,%u,%u,%u#\r\n",
+    /* 格式最長 "S,100,90,300,1\n" = 15 bytes，不超過 HM-10 BLE MTU 20 bytes */
+    int len = snprintf(buf, sizeof(buf), "S,%u,%u,%u,%u\n",
                        speed_pct, angle, dist_cm, obstacle);
     HAL_UART_Transmit(_huart, (uint8_t *)buf, (uint16_t)len, 50);
 }

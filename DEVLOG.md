@@ -1,38 +1,44 @@
 # Smart Car V1 — 開發紀錄
 
-## 今日修改（2026-06-02）
+## 2026-06-03 更新
 
-### STM32 韌體（Smart_Car_V1）
-
-#### 問題診斷與修復
+### STM32 韌體修改
 
 | 問題 | 根本原因 | 修復方式 |
 |------|----------|----------|
-| BLE 指令收不到 | `HAL_UART_RxCpltCallback` / `HAL_UART_ErrorCallback` 已在 `stm32f4xx_it.c` 定義，誤重複加到 `main.c` | 移除 `main.c` 重複定義 |
-| Telemetry 傳不回 App | USART6 MSP（PC6/PC7 AF8）設定正確，問題在 HM-10 TX→STM32 RX 方向 | 加 echo debug 確認 RX 路徑通暢 |
-| App 看不到距離更新 | HM-10 BLE 連線與 UART 是獨立的，已確認 STM32 TX→HM-10 RX→BLE→App 路徑正常 | 移除 echo debug，恢復正常 telemetry |
-| 馬達完全不動 | L298N 電源誤接 GND | 接正確電源後馬達正常 |
-| F/B 方向相反 | 實體馬達接線導致 IN1/IN2 邏輯反向 | 交換 `motor_driver.c` 中 FORWARD/BACKWARD 的 GPIO 設定 |
-| L/R 無法轉向 | 轉速比 30% 低於馬達起步力矩 | 改為 pivot turn：外輪全速，內輪停止 |
-| F 按久自動停 | 超聲波未接但 PA2 浮空，隨機觸發 obs_cnt → 進入避障狀態，之後 B/L/R 被擋 | 加 `avoidance_off` 旗標暫時停用避障 |
+| 避障邏輯誤觸發（F 按久停） | 超聲波未接，PA2 浮空亂讀 → obs_cnt 到 8 進入避障 | 加 `avoidance_off` 旗標測試後移除，恢復正常邏輯 |
+| IR 感測器浮空假觸發 | PC13 浮空讀 LOW，立即 obs_cnt=8 | 暫時 comment out IR 檢查 |
+| L/R 停止輪仍在轉 | MOTOR_STOP 用 coast 模式（IN1=IN2=LOW, ENA=LOW），輪子靠慣性滑行 | 嘗試主動剎車（IN1=IN2=HIGH）但引發新 bug，最終還原 coast |
+| Telemetry BLE 封包超過 20 bytes | `$STATUS,100,90,300,1#\r\n` = 24 bytes > HM-10 MTU | 改短格式 `S,%u,%u,%u,%u\n`（最長 15 bytes）|
+| 超聲波距離一直為 0 | TIM2 counter 可能未正確計時，t2-t1=0 | 改用 DWT（CPU cycle counter）計時，不依賴 TIM2 |
+| 超聲波 Trig 脈衝不穩定 | 使用 TIM2 counter 計 10µs，TIM2 若未啟動則死鎖 | 改用 `HAL_Delay(1)` + 前置 LOW 2ms 確保乾淨觸發 |
+| Echo PIN 衝突 | PA2 同時是 TIM2_CH3 / USART2_TX（ST-Link）| 改用 PC2（無衝突） |
+| 避障距離門檻太窄 | 僅偵測 < 20cm，容易漏觸發 | 放寬至 < 40cm |
 
-#### 程式修改清單
+### Flutter App 修改
 
-- **`Core/Src/motor_driver.c`**：FORWARD/BACKWARD GPIO 邏輯對調（PE5/PE6 與 PE11/PE13）
-- **`Core/Src/main.c`**：
-  - 移除開機馬達自動測試
-  - CAR_LEFT / CAR_RIGHT 改為 pivot turn（外輪全速，內輪停）
-  - 加入 `avoidance_off` 旗標（目前 = 1，暫停避障）
-- **`Core/Src/bluetooth.c`**：加入/移除 echo debug（最終已移除）
-- **`Core/Inc/motor_driver.h`**：MOTOR_TURN_RATIO 從 3 改為 6（後改為 pivot turn 故此值暫無作用）
+- **Telemetry regex 更新**：`\$STATUS,...#` → `S,(\d+),(\d+),(\d+),(\d+)` 配合新格式
 
-### Flutter App（smart_car_app）
+### 驗證確認
 
-- **`lib/main.dart`**：
-  - 加入 debug `_send()` 訊息（DBG: not connected / txChar null / dup / Sent / Write error）
-  - 加入/移除 `RX: $text` BLE 原始資料顯示（debug 用，已移除）
-  - `_lastCmd` 初始值從 `'S'` 改為 `'S'`（維持不變）
-  - 連線斷開時重置 `_lastCmd = ''`
+- ✅ F / B 雙輪方向正確，長按持續動
+- ✅ L / R pivot turn（一輪全速，一輪停）
+- ✅ 避障邏輯正確（dist=10 強制測試通過）：F 觸發 → 停 → 後退 → 轉向 → 確認
+- ✅ B 後退不觸發避障（正確設計）
+- ✅ Telemetry 格式在 BLE MTU 內
+
+---
+
+## 2026-06-02 修改
+
+### STM32 韌體（Smart_Car_V1）
+
+| 問題 | 根本原因 | 修復方式 |
+|------|----------|----------|
+| BLE 指令收不到 | `HAL_UART_RxCpltCallback` 已在 `stm32f4xx_it.c` 定義，誤重複加到 `main.c` | 移除重複定義 |
+| 馬達完全不動 | L298N 電源誤接 GND | 接正確電源 |
+| F/B 方向相反 | 馬達實體接線導致 IN1/IN2 邏輯反向 | 交換 FORWARD/BACKWARD GPIO |
+| L/R 無法轉向 | 轉速比 30% 低於馬達起步力矩 | 改為 pivot turn |
 
 ---
 
@@ -40,29 +46,25 @@
 
 ### ✅ 已完成
 
-- **BLE 遙控**：HM-10（MLT-BT05）← → STM32 USART6 雙向通訊正常
-- **前進（F）/ 後退（B）**：雙輪同步，方向正確，長按持續動作
-- **左轉（L）/ 右轉（R）**：pivot turn，需左右各一組馬達（OUT1/2 + OUT3/4）才能實現轉向
+- **BLE 遙控**：HM-10（MLT-BT05）雙向通訊正常
+- **F / B**：雙輪同步，方向正確
+- **L / R**：pivot turn，左右各一組馬達
 - **停止（S）**：隨時生效
-- **Telemetry**：STM32 每 300ms 傳 `$STATUS,speed,angle,dist,obstacle#` 到 App
-- **距離顯示**：App 解析 telemetry 並顯示超聲波距離（需接 HC-SR04 才有讀值）
-- **Flutter App**：BLE 掃描、連線、發指令、顯示狀態列
+- **避障邏輯**：9 狀態機完整（BRAKE → BACKUP → TURN → CHECK）
+- **Telemetry**：每 300ms 傳 `S,speed,angle,dist,obs\n`，BLE 封包 ≤ 15 bytes
+- **Flutter App**：BLE 掃描、連線、指令、距離顯示
 
-### ⚠️ 待確認 / 未完成
+### ⚠️ 待解決
 
 | 項目 | 狀態 | 備註 |
 |------|------|------|
-| 右側馬達（OUT3/4）接線 | ❌ 尚未接 | L/R 轉向需要左右兩組馬達分開 |
-| 避障（HC-SR04）| ⚠️ 暫停 | `avoidance_off = 1`，需接感測器後測試再開啟 |
-| IR 感測器 | ⚠️ 暫停 | 避障停用中，待硬體接好後一起啟用 |
-| 舵機 | ❌ 未接 | 目前設計不需要舵機（差速轉向），可移除相關 init |
-| L298N 電容 | ⚠️ 待安裝 | 100µF 並聯在 VS-GND，減少啟動電流峰值 |
-| iOS 測試 | ❌ 待辦 | 需要 Mac 才能編譯 iOS App |
-| 避障邏輯重新啟用 | ❌ 待辦 | 接好感測器後，將 `avoidance_off` 改回 `0` |
+| HC-SR04 距離讀值 | ❌ 未解決 | 5V 電源確認、PA2→PC2 換腳均無效；ECHO 訊號未到 STM32，疑模組故障或接線接觸不良 |
+| IR 感測器 | ⚠️ 暫停 | Comment out 中，待確認接線後重新啟用 |
+| iOS 測試 | ❌ 待辦 | 需要 Mac |
 
 ---
 
-## 硬體接線確認
+## 硬體接線
 
 ### L298N ↔ STM32
 | L298N | STM32 | 功能 |
@@ -77,12 +79,15 @@
 ### HM-10 ↔ STM32
 | HM-10 | STM32 | 功能 |
 |-------|-------|------|
-| TX | PC7 | BLE → STM32（指令接收）|
-| RX | PC6 | STM32 → BLE（Telemetry）|
+| TX | PC7 | BLE → STM32 |
+| RX | PC6 | STM32 → BLE |
 | VCC | 3.3V | |
 | GND | GND | |
 
-### 下一步
-1. 把右側馬達接到 OUT3/OUT4
-2. 並聯 100µF 電容到 L298N VS-GND
-3. 接好 HC-SR04 後將 `avoidance_off = 0`，測試避障
+### HC-SR04 ↔ STM32
+| HC-SR04 | STM32 | 功能 |
+|---------|-------|------|
+| VCC | **5V** | 必須 5V |
+| TRIG | PD13 | 觸發脈衝（共用橘色 LED）|
+| ECHO | PC2 | 回波輸入 |
+| GND | GND | |

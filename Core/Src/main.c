@@ -154,10 +154,8 @@ int main(void)
     uint16_t dist = ultrasonic_get_distance();
 
     /* 雙向計數器：主動動作中暫停，CHECK 狀態繼續感測 */
-    /* TODO: 測試完成後移除 avoidance_off，恢復避障 */
-    uint8_t avoidance_off = 1;
-    if (!avoidance_off && (state < CAR_AV_BRAKE || state == CAR_AV_CHECK)) {
-        if (dist > 0 && dist < 20) {
+    if (state < CAR_AV_BRAKE || state == CAR_AV_CHECK) {
+        if (dist > 0 && dist < 40) {
             if (obs_cnt < 8) obs_cnt++;
             if (clr_cnt > 0) clr_cnt--;
         } else if (dist >= 20) {
@@ -166,12 +164,12 @@ int main(void)
         }
         /* dist=0：量測失敗，不改變狀態 */
 
-        /* IR 感測器：前進方向有效，偵測到障礙直接推高 obs_cnt */
-        if ((state == CAR_FORWARD || state == CAR_LEFT || state == CAR_RIGHT)
+        /* IR 感測器：未接時先停用，避免浮空假觸發 */
+        /* if ((state == CAR_FORWARD || state == CAR_LEFT || state == CAR_RIGHT)
             && ir_sensor_read()) {
-            if (obs_cnt < 8) obs_cnt = 8;   /* 立即觸發閾值 */
+            if (obs_cnt < 8) obs_cnt = 8;
             if (clr_cnt > 0) clr_cnt--;
-        }
+        } */
     }
 
     /* 藍牙指令：STOP 隨時生效；其他指令只在非避障狀態接受 */
