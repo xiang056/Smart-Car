@@ -25,23 +25,21 @@
 #include <stdio.h>
 #include <string.h>
 #include "motor_driver.h"
-#include "ultrasonic_driver.h"
-#include "ir_sensor_driver.h"
 #include "bluetooth.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 typedef enum {
-    CAR_STOP,        /* 靜止          */
-    CAR_FORWARD,     /* 前進          */
-    CAR_BACKWARD,    /* 後退          */
-    CAR_LEFT,        /* 左轉前進      */
-    CAR_RIGHT,       /* 右轉前進      */
-    CAR_AV_BRAKE,    /* 避障：緩衝    */
-    CAR_AV_BACKUP,   /* 避障：後退    */
-    CAR_AV_TURN,     /* 避障：轉向    */
-    CAR_AV_CHECK,    /* 避障：確認清除 */
+    CAR_STOP,
+    CAR_FORWARD,
+    CAR_BACKWARD,
+    CAR_LEFT,
+    CAR_RIGHT,
+    CAR_FORWARD_LEFT,
+    CAR_FORWARD_RIGHT,
+    CAR_BACKWARD_LEFT,
+    CAR_BACKWARD_RIGHT,
 } CarState_t;
 /* USER CODE END PTD */
 
@@ -122,7 +120,6 @@ int main(void)
   HAL_Delay(2000);
   motor_init(&htim1);
   bluetooth_init(&huart6);
-  ultrasonic_init(&htim2);
 
   char boot_msg[] = "SmartCar Ready\r\n";
   HAL_UART_Transmit(&huart6, (uint8_t*)boot_msg, strlen(boot_msg), 100);
@@ -135,156 +132,77 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    static CarState_t state        = CAR_STOP;
-    static CarState_t resume_state = CAR_STOP;
-    static uint8_t    obs_cnt      = 0;
-    static uint8_t    clr_cnt      = 5;
-    static uint32_t   state_timer  = 0;
-    static uint32_t   last_trig    = 0;
-    static uint32_t   last_print   = 0;
+    static CarState_t state      = CAR_STOP;
+    static uint32_t   last_print = 0;
 
-    /* 超聲波每 60ms 觸發一次 */
-    if (HAL_GetTick() - last_trig >= 60) {
-        ultrasonic_trigger();
-        last_trig = HAL_GetTick();
-    }
-
-    uint16_t dist = ultrasonic_get_distance();
-
-    /* 雙向計數器：主動動作中暫停，CHECK 狀態繼續感測 */
-    if (state < CAR_AV_BRAKE || state == CAR_AV_CHECK) {
-        if (dist > 0 && dist < 40) {
-            if (obs_cnt < 8) obs_cnt++;
-            if (clr_cnt > 0) clr_cnt--;
-        } else if (dist >= 20) {
-            if (clr_cnt < 5) clr_cnt++;
-            if (obs_cnt > 0) obs_cnt--;
-        }
-        /* dist=0：量測失敗，不改變狀態 */
-
-        /* IR 感測器：未接時先停用，避免浮空假觸發 */
-        /* if ((state == CAR_FORWARD || state == CAR_LEFT || state == CAR_RIGHT)
-            && ir_sensor_read()) {
-            if (obs_cnt < 8) obs_cnt = 8;
-            if (clr_cnt > 0) clr_cnt--;
-        } */
-    }
-
-    /* 藍牙指令：STOP 隨時生效；其他指令只在非避障狀態接受 */
+    /* 藍牙指令 */
     BtCmd_t bt = bluetooth_get_cmd();
     if (bt != BT_CMD_NONE) {
-        if (bt == BT_CMD_STOP) {
-            state   = CAR_STOP;
-            obs_cnt = 0;
-            clr_cnt = 5;
-        } else if (state < CAR_AV_BRAKE) {
-            switch (bt) {
-                case BT_CMD_FORWARD:  state = CAR_FORWARD;  break;
-                case BT_CMD_BACKWARD: state = CAR_BACKWARD; break;
-                case BT_CMD_LEFT:     state = CAR_LEFT;     break;
-                case BT_CMD_RIGHT:    state = CAR_RIGHT;    break;
-                default: break;
-            }
+        switch (bt) {
+            case BT_CMD_FORWARD:
+                state = CAR_FORWARD;
+                break;
+            case BT_CMD_BACKWARD:
+                state = CAR_BACKWARD;
+                break;
+            case BT_CMD_LEFT:
+                if (state == CAR_FORWARD  || state == CAR_FORWARD_LEFT  || state == CAR_FORWARD_RIGHT)
+                    state = CAR_FORWARD_LEFT;
+                else if (state == CAR_BACKWARD || state == CAR_BACKWARD_LEFT || state == CAR_BACKWARD_RIGHT)
+                    state = CAR_BACKWARD_LEFT;
+                else
+                    state = CAR_LEFT;
+                break;
+            case BT_CMD_RIGHT:
+                if (state == CAR_FORWARD  || state == CAR_FORWARD_LEFT  || state == CAR_FORWARD_RIGHT)
+                    state = CAR_FORWARD_RIGHT;
+                else if (state == CAR_BACKWARD || state == CAR_BACKWARD_LEFT || state == CAR_BACKWARD_RIGHT)
+                    state = CAR_BACKWARD_RIGHT;
+                else
+                    state = CAR_RIGHT;
+                break;
+            case BT_CMD_STOP:
+                state = CAR_STOP;
+                break;
+            default: break;
         }
     }
 
     /* 狀態機 */
     switch (state) {
-
         case CAR_STOP:
             motor_stop();
             break;
-
         case CAR_FORWARD:
-            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX,
-                        MOTOR_FORWARD, MOTOR_PWM_MAX);
-            if (obs_cnt >= 8) {
-                resume_state = CAR_FORWARD;
-                state        = CAR_AV_BRAKE;
-                state_timer  = HAL_GetTick();
-            }
+            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX, MOTOR_FORWARD, MOTOR_PWM_MAX);
             break;
-
         case CAR_BACKWARD:
-            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_MAX,
-                        MOTOR_BACKWARD, MOTOR_PWM_MAX);
+            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_MAX, MOTOR_BACKWARD, MOTOR_PWM_MAX);
             break;
-
         case CAR_LEFT:
-            /* 左轉：左輪停，右輪全速 */
-            motor_drive(MOTOR_STOP,    0,             MOTOR_FORWARD, MOTOR_PWM_MAX);
-            if (obs_cnt >= 8) {
-                resume_state = CAR_LEFT;
-                state        = CAR_AV_BRAKE;
-                state_timer  = HAL_GetTick();
-            }
+            motor_drive(MOTOR_STOP, 0, MOTOR_FORWARD, MOTOR_PWM_MAX);
             break;
-
         case CAR_RIGHT:
-            /* 右轉：左輪全速，右輪停 */
-            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX, MOTOR_STOP,    0);
-            if (obs_cnt >= 8) {
-                resume_state = CAR_RIGHT;
-                state        = CAR_AV_BRAKE;
-                state_timer  = HAL_GetTick();
-            }
+            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX, MOTOR_STOP, 0);
             break;
-
-        case CAR_AV_BRAKE:
-            motor_stop();
-            if (HAL_GetTick() - state_timer >= 150) {
-                state       = CAR_AV_BACKUP;
-                state_timer = HAL_GetTick();
-            }
+        case CAR_FORWARD_LEFT:
+            motor_drive(MOTOR_FORWARD, MOTOR_PWM_INNER, MOTOR_FORWARD, MOTOR_PWM_MAX);
             break;
-
-        case CAR_AV_BACKUP:
-            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_MAX,
-                        MOTOR_BACKWARD, MOTOR_PWM_MAX);
-            if (HAL_GetTick() - state_timer >= 500) {
-                state       = CAR_AV_TURN;
-                state_timer = HAL_GetTick();
-            }
+        case CAR_FORWARD_RIGHT:
+            motor_drive(MOTOR_FORWARD, MOTOR_PWM_MAX, MOTOR_FORWARD, MOTOR_PWM_INNER);
             break;
-
-        case CAR_AV_TURN:
-            /* 原地左轉：左輪後退，右輪前進 */
-            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_MAX * 6 / 10,
-                        MOTOR_FORWARD,  MOTOR_PWM_MAX * 6 / 10);
-            if (HAL_GetTick() - state_timer >= 700) {
-                state       = CAR_AV_CHECK;
-                state_timer = HAL_GetTick();
-                obs_cnt     = 6;
-                clr_cnt     = 0;
-            }
+        case CAR_BACKWARD_LEFT:
+            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_INNER, MOTOR_BACKWARD, MOTOR_PWM_MAX);
             break;
-
-        case CAR_AV_CHECK:
-            motor_stop();
-            if (obs_cnt >= 8) {
-                /* 障礙仍在，再次閃避 */
-                state       = CAR_AV_BRAKE;
-                state_timer = HAL_GetTick();
-            } else if (clr_cnt >= 5) {
-                /* 路徑清除，恢復 */
-                state   = resume_state;
-                obs_cnt = 0;
-            } else if (HAL_GetTick() - state_timer >= 3000) {
-                /* 超時強制恢復 */
-                state   = resume_state;
-                obs_cnt = 0;
-                clr_cnt = 5;
-            }
+        case CAR_BACKWARD_RIGHT:
+            motor_drive(MOTOR_BACKWARD, MOTOR_PWM_MAX, MOTOR_BACKWARD, MOTOR_PWM_INNER);
             break;
     }
 
-    /* telemetry：每 300ms 送一次 $STATUS 給 App */
+    /* telemetry：每 300ms 送一次給 App */
     if (HAL_GetTick() - last_print >= 300) {
-        uint16_t spd_pct = (state == CAR_STOP ||
-                            state == CAR_AV_BRAKE ||
-                            state == CAR_AV_CHECK) ? 0 : 100;
-        uint8_t  obs     = (obs_cnt >= 8) ? 1 : 0;
-        bluetooth_send_status(spd_pct, 90, dist, obs);
+        uint16_t spd_pct = (state == CAR_STOP) ? 0 : 100;
+        bluetooth_send_status(spd_pct, state);
         last_print = HAL_GetTick();
     }
 

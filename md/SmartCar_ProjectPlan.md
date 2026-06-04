@@ -5,7 +5,7 @@
 | 項目 | 詳情 |
 |------|------|
 | **硬體平台** | STM32F407VG Discovery Board |
-| **核心功能** | 藍牙遠端控制 + 自動避障 + 實時顯示 |
+| **核心功能** | 藍牙遠端控制 + 實時顯示 |
 | **開發環境** | STM32CubeIDE (硬體配置+編譯) + VS Code (業務邏輯開發) |
 | **開發模式** | 純裸機 (無 RTOS) |
 | **目標交付** | 分階段迭代，每個功能獨立驗證 |
@@ -16,31 +16,26 @@
 
 ### 1. 完整 PIN 分配表
 
+> **硬體變更紀錄（2026-06-04）**：HC-05 改為 HM-10 BLE；HC-SR04 與紅外線感測器因車體空間不足取消。
+
 | 功能模組 | 連接器 | STM32 GPIO | 通訊協議 | 說明 |
 |---------|--------|-----------|--------|------|
-| **HC-05 藍牙** | TX → PA9 | UART1_RX | UART 9600bps | 接收手機命令 |
-| | RX → PA10 | UART1_TX | | 發送狀態反饋 |
-| | VCC | 5V | | 電源轉換模組供電 |
+| **HM-10 BLE** | TX → PC7 | USART6_RX | UART 9600bps | 接收手機命令 |
+| | RX → PC6 | USART6_TX | | 發送狀態反饋 |
+| | VCC | 3.3V | | 直接接 STM32 |
 | | GND | GND | | 共地 |
 | **OLED I2C** | SDA | PB7 | I2C1_SDA | 顯示速度/方向/狀態 |
 | | SCL | PB6 | I2C1_SCL | |
 | | VCC | 3.3V | | 直接接 STM32 |
 | | GND | GND | | |
-| **L298N 馬達驅動** | IN1 (前馬達) | PE5 | GPIO | PWM 方向控制 |
-| | IN2 (前馬達) | PE6 | GPIO | |
-| | EN (前馬達) | PE9 | Timer PWM | PWM 速度控制（TIM1_CH1） |
-| | IN3 (後馬達) | PE11 | GPIO | PWM 方向控制 |
-| | IN4 (後馬達) | PE13 | GPIO | |
-| | EN (後馬達) | PE14 | Timer PWM | PWM 速度控制（TIM1_CH4） |
+| **L298N 馬達驅動** | IN1 (左輪) | PE5 | GPIO | 方向控制 |
+| | IN2 (左輪) | PE6 | GPIO | |
+| | ENA (左輪) | PE9 | TIM1_CH1 PWM | 速度控制（拔跳帽） |
+| | IN3 (右輪) | PE11 | GPIO | 方向控制 |
+| | IN4 (右輪) | PE13 | GPIO | |
+| | ENB (右輪) | PE14 | TIM1_CH4 PWM | 速度控制（拔跳帽） |
 | | GND | GND | | 共地 |
-| **SG90 伺服馬達** | Signal | PD12 | Timer PWM | 50Hz PWM，脈寬 0.5~2.5ms 控制角度 |
-| | VCC | 5V | | 電源轉換模組供電 |
-| | GND | GND | | |
-| **HC-SR04 超聲波** | Trig | PD13 | GPIO | 觸發脈衝（≥10µs） |
-| | Echo | PD14 | Timer Input Capture | 測脈寬計算距離 |
-| | VCC | 5V | | |
-| | GND | GND | | |
-| **紅外線反射感測器** | OUT | PC13 | GPIO | 數位讀取（HIGH=無障礙, LOW=有障礙） |
+| **SG90 伺服馬達** | Signal | PA6 | TIM3_CH1 PWM | 50Hz，脈寬 0.5~2.5ms |
 | | VCC | 5V | | |
 | | GND | GND | | |
 
@@ -59,10 +54,8 @@ STM32F407 Discovery（內部）
 
 ### 3. 關鍵連線注意
 
-#### ⚠️ HC-05 電壓分壓
-HC-05 RX 是 3.3V TTL，STM32 TX 輸出為 3.3V（相容），但建議用電阻分壓確保安全：
-- STM32 PA10(TX) → 1kΩ → HC-05 RX
-- HC-05 RX → GND（配置成分壓，詳見下面電路圖）
+#### ⚠️ HM-10 BLE 電源
+HM-10 為 3.3V 模組，直接接 STM32 3.3V 腳，TX/RX 電壓相容，無需分壓。
 
 #### ⚠️ L298N 電源隔離
 - L298N 有獨立的馬達電源腳（+12V/+5V）和邏輯電源腳（+5V GND）
@@ -84,27 +77,16 @@ SmartCar/
 ├── Core/
 │   ├── Inc/
 │   │   ├── main.h
-│   │   ├── config.h              # 全局配置（腳位、時鐘、波特率）
-│   │   ├── uart_driver.h         # UART 抽象層
-│   │   ├── i2c_driver.h          # I2C 抽象層
 │   │   ├── motor_driver.h        # 馬達驅動層
 │   │   ├── servo_driver.h        # 伺服馬達驅動
-│   │   ├── ultrasonic_driver.h   # 超聲波驅動
-│   │   ├── ir_sensor_driver.h    # 紅外線感測器
-│   │   ├── oled_driver.h         # OLED 顯示驅動
-│   │   ├── bluetooth.h           # 藍牙通訊協議層
-│   │   └── state_machine.h       # 整體狀態機
+│   │   ├── oled_driver.h         # OLED 顯示驅動（待實作）
+│   │   └── bluetooth.h           # BLE 通訊協議層
 │   └── Src/
-│       ├── main.c
-│       ├── uart_driver.c
-│       ├── i2c_driver.c
+│       ├── main.c                # 狀態機主迴圈
 │       ├── motor_driver.c
 │       ├── servo_driver.c
-│       ├── ultrasonic_driver.c
-│       ├── ir_sensor_driver.c
-│       ├── oled_driver.c
-│       ├── bluetooth.c
-│       └── state_machine.c
+│       ├── oled_driver.c         # 待實作
+│       └── bluetooth.c
 │
 ├── Drivers/
 │   ├── CMSIS/                    # STM32 CMSIS 核心文件（CubeIDE 生成）
@@ -115,18 +97,13 @@ SmartCar/
 
 ### 模塊化設計原則
 
-| 模塊 | 責任 | 進度依賴 |
-|------|------|---------|
-| **Config** | 全局宏定義、GPIO 映射、時鐘設定 | 無 |
-| **UART Driver** | HC-05 收發、隊列管理、超時 | Config |
-| **I2C Driver** | OLED 通訊、地址自動檢測 | Config |
-| **Motor Driver** | PWM 速度/方向控制、安全檢查 | Config |
-| **Servo Driver** | 50Hz PWM 角度映射（0~180°） | Config |
-| **Ultrasonic Driver** | 距離測量、超時保護 | Config |
-| **IR Sensor Driver** | 數位讀取、防抖 | Config |
-| **OLED Driver** | SSD1306 初始化、文字/數字顯示 | I2C Driver |
-| **Bluetooth** | 命令解析（F/B/L/R/S）、狀態反饋 | UART Driver |
-| **State Machine** | 整合所有模塊、執行邏輯流程 | 以上所有 |
+| 模塊 | 責任 | 狀態 |
+|------|------|------|
+| **Motor Driver** | PWM 速度/方向控制（左右輪獨立） | ✅ 完成 |
+| **Servo Driver** | TIM3 50Hz PWM 角度映射（0~180°） | ✅ 完成（待接入主迴圈） |
+| **Bluetooth** | HM-10 BLE 命令解析 + telemetry | ✅ 完成 |
+| **OLED Driver** | SSD1306 I2C 初始化、文字/數字顯示 | ❌ 待實作 |
+| **State Machine** | main.c 主迴圈，F/B/L/R/S 控制 | ✅ 完成 |
 
 ---
 

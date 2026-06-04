@@ -22,7 +22,6 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ultrasonic_driver.h"
 #include "bluetooth.h"
 /* USER CODE END Includes */
 
@@ -281,11 +280,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
     bluetooth_rearm();
-}
-
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
-{
-    ultrasonic_capture_callback(htim);
 }
 
 /* USER CODE END 1 */
