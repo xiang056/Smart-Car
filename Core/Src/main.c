@@ -150,6 +150,8 @@ int main(void)
                     state = CAR_FORWARD_LEFT;
                 else if (state == CAR_BACKWARD || state == CAR_BACKWARD_LEFT || state == CAR_BACKWARD_RIGHT)
                     state = CAR_BACKWARD_LEFT;
+                else if (state == CAR_RIGHT)
+                    state = CAR_STOP;  /* 反向 pivot 先停，避免方向瞬切 */
                 else
                     state = CAR_LEFT;
                 break;
@@ -158,6 +160,8 @@ int main(void)
                     state = CAR_FORWARD_RIGHT;
                 else if (state == CAR_BACKWARD || state == CAR_BACKWARD_LEFT || state == CAR_BACKWARD_RIGHT)
                     state = CAR_BACKWARD_RIGHT;
+                else if (state == CAR_LEFT)
+                    state = CAR_STOP;  /* 反向 pivot 先停，避免方向瞬切 */
                 else
                     state = CAR_RIGHT;
                 break;
@@ -201,9 +205,9 @@ int main(void)
 
     /* telemetry：每 300ms 送一次給 App */
     if (HAL_GetTick() - last_print >= 300) {
+        last_print = HAL_GetTick();  /* 先記錄時間，避免阻塞傳輸導致計時偏移 */
         uint16_t spd_pct = (state == CAR_STOP) ? 0 : 100;
         bluetooth_send_status(spd_pct, state);
-        last_print = HAL_GetTick();
     }
 
     HAL_Delay(20);

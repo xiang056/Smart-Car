@@ -2,6 +2,20 @@
 
 ---
 
+## 2026-06-05 Code Review 修正
+
+### 問題與修復
+
+| 檔案 | 問題 | 修復 |
+| ---- | ---- | ---- |
+| `bluetooth.h` | 注釋只列 5 個狀態（0–4），實際 enum 有 9 個（0–8） | 補全所有 9 個狀態說明 |
+| `bluetooth.c` | `snprintf` 返回值直接 cast `uint16_t`，未檢查負值 | 加 `if (len > 0)` 防護 |
+| `main.c` | Pivot 反向瞬切：CAR_LEFT 收到 R（或反之）直接切換方向，馬達未停 | 反向 pivot 指令先轉 `CAR_STOP`，下一圈再接受新方向 |
+| `main.c` | `last_print` 在阻塞傳輸後才記錄，300ms 週期抖動 ~10ms | 先記 `last_print`，再呼叫 transmit |
+| `md/SmartCar_ProjectPlan.md` | 檔案樹與模塊表仍列已刪除的 servo_driver.h/c | 移除相關條目 |
+
+---
+
 ## 2026-06-04 重構：硬體精簡 + 差速轉向 + App 對齊
 
 ### 硬體決策

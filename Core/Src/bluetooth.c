@@ -53,5 +53,6 @@ void bluetooth_send_status(uint16_t speed_pct, uint8_t state)
     char buf[16];
     /* 格式 "S,100,4\n" = 8 bytes，遠低於 HM-10 BLE MTU 20 bytes */
     int len = snprintf(buf, sizeof(buf), "S,%u,%u\n", speed_pct, state);
-    HAL_UART_Transmit(_huart, (uint8_t *)buf, (uint16_t)len, 50);
+    if (len > 0)
+        HAL_UART_Transmit(_huart, (uint8_t *)buf, (uint16_t)len, 50);
 }

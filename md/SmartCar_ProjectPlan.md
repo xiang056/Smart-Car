@@ -78,13 +78,11 @@ SmartCar/
 │   ├── Inc/
 │   │   ├── main.h
 │   │   ├── motor_driver.h        # 馬達驅動層
-│   │   ├── servo_driver.h        # 伺服馬達驅動
 │   │   ├── oled_driver.h         # OLED 顯示驅動（待實作）
 │   │   └── bluetooth.h           # BLE 通訊協議層
 │   └── Src/
 │       ├── main.c                # 狀態機主迴圈
 │       ├── motor_driver.c
-│       ├── servo_driver.c
 │       ├── oled_driver.c         # 待實作
 │       └── bluetooth.c
 │
@@ -100,7 +98,6 @@ SmartCar/
 | 模塊 | 責任 | 狀態 |
 |------|------|------|
 | **Motor Driver** | PWM 速度/方向控制（左右輪獨立） | ✅ 完成 |
-| **Servo Driver** | TIM3 50Hz PWM 角度映射（0~180°） | ✅ 完成（待接入主迴圈） |
 | **Bluetooth** | HM-10 BLE 命令解析 + telemetry | ✅ 完成 |
 | **OLED Driver** | SSD1306 I2C 初始化、文字/數字顯示 | ❌ 待實作 |
 | **State Machine** | main.c 主迴圈，F/B/L/R/S 控制 | ✅ 完成 |
