@@ -4,17 +4,11 @@ STM32F407VG Discovery Board 裸機開發的藍牙遙控小車，搭配 Flutter A
 
 ---
 
-## 實機照片
-
-![Smart Car V1](docs/car.jpg)
-
-*4 輪底盤 + STM32F407 Discovery + L298N + HM-10 BLE*
-
-### App 畫面
+## App 畫面
 
 | STOP | FORWARD | FWD LEFT | BWD RIGHT |
 |------|---------|----------|-----------|
-| ![stop](docs/app_stop.jpg) | ![forward](docs/app_forward.jpg) | ![fwd_left](docs/app_fwd_left.jpg) | ![bwd_right](docs/app_bwd_right.jpg) |
+| ![stop](docs/Screenshot_2026-06-10-20-58-51-97.png) | ![forward](docs/Screenshot_2026-06-10-20-59-44-26.png) | ![fwd_left](docs/Screenshot_2026-06-10-20-59-03-14.png) | ![bwd_right](docs/Screenshot_2026-06-10-21-00-02-09.png) |
 
 ---
 
