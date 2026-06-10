@@ -4,6 +4,14 @@ STM32F407VG Discovery Board 裸機開發的藍牙遙控小車，搭配 Flutter A
 
 ---
 
+## 展示影片
+
+[![Smart Car V1 Demo](https://img.youtube.com/vi/VI2FP94zHzA/0.jpg)](https://youtube.com/shorts/VI2FP94zHzA)
+
+## 實機照片
+
+![Smart Car V1](docs/car.jpg)
+
 ## App 畫面
 
 | STOP | FORWARD | FWD LEFT | BWD RIGHT |
