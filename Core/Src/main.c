@@ -132,18 +132,42 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    static CarState_t state      = CAR_STOP;
-    static uint32_t   last_print = 0;
+    static CarState_t state        = CAR_STOP;
+    static CarState_t pending      = CAR_STOP;  /* 換向緩衝：等停止後再套用 */
+    static uint32_t   stop_until   = 0;         /* 停止保持到這個 tick */
+    static uint32_t   last_print   = 0;
+
+    /* 換向緩衝：停止 100ms 後才切換到 pending 狀態 */
+    if (pending != CAR_STOP && HAL_GetTick() >= stop_until) {
+        state   = pending;
+        pending = CAR_STOP;
+    }
+
+    /* 判斷是否為前進群 or 後退群 */
+    #define IS_FWD(s) ((s)==CAR_FORWARD||(s)==CAR_FORWARD_LEFT||(s)==CAR_FORWARD_RIGHT)
+    #define IS_BWD(s) ((s)==CAR_BACKWARD||(s)==CAR_BACKWARD_LEFT||(s)==CAR_BACKWARD_RIGHT)
 
     /* 藍牙指令 */
     BtCmd_t bt = bluetooth_get_cmd();
     if (bt != BT_CMD_NONE) {
         switch (bt) {
             case BT_CMD_FORWARD:
-                state = CAR_FORWARD;
+                if (IS_BWD(state)) {          /* 後退→前進：插入 100ms 停止 */
+                    state      = CAR_STOP;
+                    pending    = CAR_FORWARD;
+                    stop_until = HAL_GetTick() + 100;
+                } else {
+                    state = CAR_FORWARD;
+                }
                 break;
             case BT_CMD_BACKWARD:
-                state = CAR_BACKWARD;
+                if (IS_FWD(state)) {          /* 前進→後退：插入 100ms 停止 */
+                    state      = CAR_STOP;
+                    pending    = CAR_BACKWARD;
+                    stop_until = HAL_GetTick() + 100;
+                } else {
+                    state = CAR_BACKWARD;
+                }
                 break;
             case BT_CMD_LEFT:
                 if (state == CAR_FORWARD  || state == CAR_FORWARD_LEFT  || state == CAR_FORWARD_RIGHT)
@@ -317,7 +341,7 @@ static void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 8399;
+  htim1.Init.Period = 33599;  /* 168MHz / 33600 = 5kHz，L298N 效率較佳 */
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
