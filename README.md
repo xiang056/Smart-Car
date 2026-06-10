@@ -1,6 +1,12 @@
 # Smart Car V1 — STM32F407 BLE 遙控小車
 
-STM32F407VG Discovery Board 裸機開發的藍牙遙控小車，搭配 Flutter App 進行雙向通訊與即時狀態顯示。
+STM32F407VG 裸機 BLE 遙控小車 — 9 態狀態機差速轉向、中斷驅動 UART、全雙工 BLE 通訊。搭配 [Flutter App](https://github.com/xiang056/smart-car-app) 遙控與即時狀態顯示。
+
+**專案亮點**
+- 9 態狀態機實現差速轉向 + pivot 原地轉向，含換向保護
+- TIM1 PWM 5kHz + USART6 中斷驅動，全裸機（無 RTOS）
+- HM-10 BLE 雙向通訊：控制延遲優化 + telemetry 精簡至 10 bytes
+- 完整 DEVLOG 記錄設計決策與 debug 歷程
 
 ---
 
