@@ -45,7 +45,8 @@ typedef enum {
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define IS_FWD(s) ((s)==CAR_FORWARD||(s)==CAR_FORWARD_LEFT||(s)==CAR_FORWARD_RIGHT)
+#define IS_BWD(s) ((s)==CAR_BACKWARD||(s)==CAR_BACKWARD_LEFT||(s)==CAR_BACKWARD_RIGHT)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -143,10 +144,6 @@ int main(void)
         pending = CAR_STOP;
     }
 
-    /* 判斷是否為前進群 or 後退群 */
-    #define IS_FWD(s) ((s)==CAR_FORWARD||(s)==CAR_FORWARD_LEFT||(s)==CAR_FORWARD_RIGHT)
-    #define IS_BWD(s) ((s)==CAR_BACKWARD||(s)==CAR_BACKWARD_LEFT||(s)==CAR_BACKWARD_RIGHT)
-
     /* 藍牙指令 */
     BtCmd_t bt = bluetooth_get_cmd();
     if (bt != BT_CMD_NONE) {
@@ -230,7 +227,10 @@ int main(void)
     /* telemetry：每 300ms 送一次給 App */
     if (HAL_GetTick() - last_print >= 300) {
         last_print = HAL_GetTick();  /* 先記錄時間，避免阻塞傳輸導致計時偏移 */
-        uint16_t spd_pct = (state == CAR_STOP) ? 0 : 100;
+        uint16_t spd_pct = (state == CAR_STOP) ? 0
+                         : (state == CAR_FORWARD_LEFT || state == CAR_BACKWARD_LEFT
+                            || state == CAR_FORWARD_RIGHT || state == CAR_BACKWARD_RIGHT)
+                           ? (MOTOR_PWM_INNER * 100U / MOTOR_PWM_MAX) : 100;
         bluetooth_send_status(spd_pct, state);
     }
 

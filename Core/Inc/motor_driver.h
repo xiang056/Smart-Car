@@ -3,8 +3,7 @@
 
 #include "stm32f4xx_hal.h"
 
-/* TIM1 ARR = 8399, APB2 84MHz, PSC=0 → 10kHz PWM */
-#define MOTOR_PWM_MAX    33599  /* TIM1 ARR，5kHz PWM */
+#define MOTOR_PWM_MAX    33599  /* TIM1 ARR，168MHz / 33600 = 5kHz PWM */
 #define MOTOR_PWM_INNER  (MOTOR_PWM_MAX * 6 / 10)   /* 曲線轉向內輪速 60% */
 
 typedef enum {
